@@ -4,13 +4,15 @@ using System.Text;
 
 namespace EbabyLab
 {
+    public enum UserManagerStatus { Success, InvalidUserCredentials, SystemError }
+
     public class UserManager
     {
        public List<User> Users { get; private set; } = new List<User>();
 
         public bool Register(User user)
         {
-            if (this.FindUserbyUserName(user.UserName) != null)
+            if (FindUserbyUserName(user.UserName) != null)
             {
                 return false;
             }
@@ -26,14 +28,19 @@ namespace EbabyLab
             return Users.Find(x => x.UserName == userName);
         }
 
-        public bool LogIn(string userName, string password)
+        public bool LogIn(string userName, string password, out UserManagerStatus status)
         {
+
            User user = FindUserbyUserName(userName);
-            if (user == null || password != user.Password)
+            if (user == null || !user.CheckPassword(password))
+            {
+                status = UserManagerStatus.InvalidUserCredentials;
                 return false;
+            }
+
             user.LoggedIn = true;
+            status = UserManagerStatus.Success;
             return true;
-  
         }
 
         public bool LogOut (string userName)

@@ -10,8 +10,9 @@ namespace EbabyLab
             LastName = lastName;
             UserEmail = userEmail;
             UserName = userName;
-            Password = password;
+            userPassword = password;
         }
+
 
         public string FirstName { get; set; }
 
@@ -21,13 +22,16 @@ namespace EbabyLab
 
         public string UserName { get; set; }
 
-        public string Password { get; set; }
-
-
         public bool LoggedIn { get; set; } = false;
 
         public bool IsSeller { get; set; } = false;
 
+        private string userPassword;
+
+        public bool CheckPassword(string password)
+        {
+            return userPassword == password;
+        }
 
     }
 }
