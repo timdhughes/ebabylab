@@ -12,12 +12,19 @@ namespace EbabyUnitTest
         const string anyUserEmail = "ngupta@miteksystems.com";
         const string anyUserName = "ngupta";
         const string anyPassword = "1Password!";
-        const double anyStartingPrice = 100.00;
+        const decimal anyStartingPrice = 100.00M;
 
 
         User CreateDefaultUser()
         {
             return new User(anyFirstName, anyLastName, anyUserEmail, anyUserName, anyPassword);
+        }
+
+        User CreateDefaultBidder()
+        {
+            return new User("Bidder", "LastName", "bidder@gmail.com", "bidder", "bidder123!")
+            { LoggedIn = true };
+      
         }
 
         Auction CreateDefaultAuction()
@@ -35,6 +42,19 @@ namespace EbabyUnitTest
 
             return auction;
         }
+
+        Auction CreateSuccessfulAuction(Auction.ItemCategory itemCategory = Auction.ItemCategory.Misc)
+        {
+            Auction auction = CreateDefaultAuction();
+            auction.Category = itemCategory;
+            auction.OnStart();
+            decimal bidAmount = anyStartingPrice + 1.00M;
+            auction.Bid(CreateDefaultBidder(), bidAmount, out Auction.BidStatus status);
+            auction.OnClose();
+
+            return auction;
+        }
+
 
         [TestMethod]
         public void TestRetreivingParamsAfterConstruction()
@@ -124,7 +144,7 @@ namespace EbabyUnitTest
 
             // Auction information
             string itemDesc = "Laptop";
-            double startingPrice = 100.00;
+            decimal startingPrice = 100;
             DateTime startTime = DateTime.Now.AddDays(1);
             DateTime endTime = startTime.AddDays(5);
 
@@ -134,7 +154,7 @@ namespace EbabyUnitTest
             Auction auction = Auction.Create(seller, itemDesc, startingPrice, startTime, endTime);
             Assert.IsNotNull(auction, "Auction can not be created");
 
-            Assert.AreEqual(auction.Seller, anyUserName, "Username does not match");
+            Assert.AreEqual(auction.Seller.UserName, anyUserName, "Username does not match");
             Assert.AreEqual(auction.ItemDesc, itemDesc, "Item description does not match");
             Assert.AreEqual(auction.StartingPrice, startingPrice, "Username does not match");
             Assert.AreEqual(auction.StartingPrice, auction.CurrentPrice, "At the beginning of the auction, starting price should equal current price.");
@@ -162,12 +182,12 @@ namespace EbabyUnitTest
             auction.OnStart();
 
             // user will bid 1 dollar over starting price
-            double bidAmount = auction.StartingPrice + 1.00;
+            decimal bidAmount = auction.StartingPrice + 1.00M;
             bool success = auction.Bid(user, bidAmount, out Auction.BidStatus status);
 
             Assert.IsTrue(success, "Bid was not successful." + status.ToString());
             Assert.AreEqual(auction.CurrentPrice, bidAmount);
-            Assert.AreEqual(auction.HighestBidder, user.UserName);
+            Assert.AreEqual(auction.HighestBidder.UserName, user.UserName);
         }
 
         [TestMethod]
@@ -180,10 +200,102 @@ namespace EbabyUnitTest
             Auction auction = CreateDefaultAuction();
             auction.OnStart();
 
-            auction.Bid(user, anyStartingPrice + 1.0, out Auction.BidStatus status);
+            auction.Bid(user, anyStartingPrice + 1.0M, out Auction.BidStatus status);
 
             Assert.AreEqual(Auction.BidStatus.UserNotLoggedIn, status, "User should not be able to place a bid if not logged in.");
 
         }
+
+        [TestMethod]
+
+        public void TestNotificationHighestBidder()
+        {
+            
+            Auction auction = CreateDefaultAuction();
+            auction.OnStart();
+            decimal bidAmount = anyStartingPrice + 1.00M;
+            auction.Bid(CreateDefaultBidder(), bidAmount, out Auction.BidStatus status);
+
+            auction.OnClose();
+
+            string expectedMessage = "Congratulations! You won an auction for a " + auction.ItemDesc + " from " + anyUserName + " for " + bidAmount.ToString("C2") + ".";
+
+            string message = auction.PostOffice.FindEmail(auction.HighestBidder.UserEmail, expectedMessage);
+
+            Assert.IsFalse(string.IsNullOrEmpty(message), "Expected: " + expectedMessage);
+        }
+
+        [TestMethod]
+
+        public void TestNotificationNoBidders()
+        {
+
+            Auction auction = CreateDefaultAuction();
+            auction.OnStart();   
+            auction.OnClose();
+
+            string expectedMessage = "Sorry, your auction for " + auction.ItemDesc + " did not have any bidders.";
+            string message = auction.PostOffice.FindEmail(auction.Seller.UserEmail, expectedMessage);
+            Assert.IsFalse(string.IsNullOrEmpty(message), "Expected: " + expectedMessage);
+        }
+
+        [TestMethod]
+
+        public void TestNotifySellerOnSuccessfullAuction()
+        {
+            Auction auction = CreateSuccessfulAuction();        
+            string expectedMessage = "Your " + auction.ItemDesc + " auction sold to bidder " + auction.HighestBidder.UserEmail + " for " + auction.CurrentPrice.ToString("C2") + ".";
+            string message = auction.PostOffice.FindEmail(auction.Seller.UserEmail, expectedMessage);
+            Assert.IsFalse(string.IsNullOrEmpty(message), "Expected: " + expectedMessage);
+        }
+
+        [TestMethod]
+
+        public void TestSellerAmount()
+        {
+            Auction auction = CreateSuccessfulAuction();
+            Assert.AreEqual(.98M * auction.CurrentPrice, auction.SellerAmount);
+        }
+
+        [TestMethod]
+        public void TestBuyerAmountMisc()
+        {
+            Auction auction = CreateSuccessfulAuction(Auction.ItemCategory.Misc);
+            Assert.AreEqual(10.00M + auction.CurrentPrice, auction.BuyerAmount);
+
+        }
+
+        [TestMethod]
+        public void TestBuyerAmountCar()
+        {
+            Auction auction = CreateSuccessfulAuction(Auction.ItemCategory.Car);
+            Assert.AreEqual(auction.CurrentPrice + 1000.00M, auction.BuyerAmount);
+
+        }
+
+        [TestMethod]
+        public void TestBuyerAmountCarOver50k()
+        {
+            Auction auction = CreateDefaultAuction();
+            auction.Category = Auction.ItemCategory.Car;
+            auction.OnStart();
+            decimal bidAmount = 50000.01M;
+            auction.Bid(CreateDefaultBidder(), bidAmount, out Auction.BidStatus status);
+            auction.OnClose();
+            Assert.AreEqual(auction.CurrentPrice * 1.04M + 1000.0M, auction.BuyerAmount);
+            
+
+        }
+
+        [TestMethod]
+        public void TestBuyerAmountDownloadableSoftware()
+        {
+            Auction auction = CreateSuccessfulAuction(Auction.ItemCategory.DownloadableSoftware);
+            
+            Assert.AreEqual(auction.CurrentPrice, auction.BuyerAmount);
+
+        }
+
+
     }
 }
