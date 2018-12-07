@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using eBabyLab;
 using eBabyServices;
-namespace EbabyLab
+namespace eBabyLab
 {
 
     public class Auction
@@ -95,8 +95,13 @@ namespace EbabyLab
         {
             Sale sale = SaleFactory.GetInstance(HighestBidder);
             sale.SendNotifications(this, PostOffice);
-            sale.UpdatePrice(this); 
 
+            var fees = FeeFactory.GetFees(this);
+
+            foreach (var fee in fees)
+            {
+                fee.Update(this);
+            }
         }
     }
 }

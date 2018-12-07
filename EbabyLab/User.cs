@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace EbabyLab
+namespace eBabyLab
 {
     public class User
     {

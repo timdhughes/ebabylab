@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace EbabyLab
+namespace eBabyLab
 {
     public enum UserManagerStatus { Success, InvalidUserCredentials, SystemError }
 
