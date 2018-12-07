@@ -1,6 +1,8 @@
 ﻿using System;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using eBabyLab;
+using System.IO;
+using eBabyServices;
 
 namespace EbabyUnitTest
 {
@@ -24,7 +26,7 @@ namespace EbabyUnitTest
         {
             return new User("Bidder", "LastName", "bidder@gmail.com", "bidder", "bidder123!")
             { LoggedIn = true };
-      
+
         }
 
         Auction CreateDefaultAuction()
@@ -43,18 +45,33 @@ namespace EbabyUnitTest
             return auction;
         }
 
-        Auction CreateSuccessfulAuction(Auction.ItemCategory itemCategory = Auction.ItemCategory.Misc)
+        Auction CreateSuccessfulAuction(Auction.ItemCategory itemCategory = Auction.ItemCategory.Misc, decimal amount = anyStartingPrice + 1.00M)
         {
             Auction auction = CreateDefaultAuction();
             auction.Category = itemCategory;
             auction.OnStart();
-            decimal bidAmount = anyStartingPrice + 1.00M;
+            decimal bidAmount = amount;
             auction.Bid(CreateDefaultBidder(), bidAmount, out Auction.BidStatus status);
             auction.OnClose();
 
             return auction;
         }
 
+        string CreateAuctionLog(Auction auction)
+        {
+            return auction.Seller.UserName + "," + auction.HighestBidder.UserName + "," + auction.ItemDesc + "," +
+                            auction.CurrentPrice.ToString() + "," + auction.BuyerAmount.ToString() + "," + auction.SellerAmount.ToString();
+        }
+
+        [TestCleanup]
+        public void TestTeardown()
+        {
+            if (File.Exists("car_sales.csv"))
+                File.Delete("car_sales.csv");
+
+            if (File.Exists("large_sales.csv"))
+                File.Delete("large_sales.csv");
+        }
 
         [TestMethod]
         public void TestRetreivingParamsAfterConstruction()
@@ -210,7 +227,7 @@ namespace EbabyUnitTest
 
         public void TestNotificationHighestBidder()
         {
-            
+
             Auction auction = CreateDefaultAuction();
             auction.OnStart();
             decimal bidAmount = anyStartingPrice + 1.00M;
@@ -231,7 +248,7 @@ namespace EbabyUnitTest
         {
 
             Auction auction = CreateDefaultAuction();
-            auction.OnStart();   
+            auction.OnStart();
             auction.OnClose();
 
             string expectedMessage = "Sorry, your auction for " + auction.ItemDesc + " did not have any bidders.";
@@ -243,7 +260,7 @@ namespace EbabyUnitTest
 
         public void TestNotifySellerOnSuccessfullAuction()
         {
-            Auction auction = CreateSuccessfulAuction();        
+            Auction auction = CreateSuccessfulAuction();
             string expectedMessage = "Your " + auction.ItemDesc + " auction sold to bidder " + auction.HighestBidder.UserEmail + " for " + auction.CurrentPrice.ToString("C2") + ".";
             string message = auction.PostOffice.FindEmail(auction.Seller.UserEmail, expectedMessage);
             Assert.IsFalse(string.IsNullOrEmpty(message), "Expected: " + expectedMessage);
@@ -276,26 +293,95 @@ namespace EbabyUnitTest
         [TestMethod]
         public void TestBuyerAmountCarOver50k()
         {
-            Auction auction = CreateDefaultAuction();
-            auction.Category = Auction.ItemCategory.Car;
-            auction.OnStart();
-            decimal bidAmount = 50000.01M;
-            auction.Bid(CreateDefaultBidder(), bidAmount, out Auction.BidStatus status);
-            auction.OnClose();
+            Auction auction = CreateSuccessfulAuction(Auction.ItemCategory.Car, 50000.01M);
             Assert.AreEqual(auction.CurrentPrice * 1.04M + 1000.0M, auction.BuyerAmount);
-            
-
         }
 
         [TestMethod]
         public void TestBuyerAmountDownloadableSoftware()
         {
             Auction auction = CreateSuccessfulAuction(Auction.ItemCategory.DownloadableSoftware);
-            
+
             Assert.AreEqual(auction.CurrentPrice, auction.BuyerAmount);
 
         }
 
+        [TestMethod]
+        public void TestLogCarSales()
+        {
+            Auction auction = CreateSuccessfulAuction(Auction.ItemCategory.Car, 10000.0M);
+            string expectedLog = CreateAuctionLog(auction);
+            Assert.IsTrue(NotificationFactory.CarSaleLogger.FindMessage(expectedLog), "Expected auction log: " + expectedLog);
+            Assert.IsFalse(NotificationFactory.LargeSaleLogger.FindMessage(expectedLog), "Expected auction log: " + expectedLog);
 
+        }
+
+        [TestMethod]
+        public void TestLogCarSalesOver10k()
+        {
+            Auction auction = CreateSuccessfulAuction(Auction.ItemCategory.Car, 10000.01M);
+            string expectedLog = CreateAuctionLog(auction);
+            Assert.IsTrue(NotificationFactory.CarSaleLogger.FindMessage(expectedLog), "Expected auction log: " + expectedLog);
+            Assert.IsTrue(NotificationFactory.LargeSaleLogger.FindMessage(expectedLog), "Expected auction log: " + expectedLog);
+
+        }
+
+
+        [TestMethod]
+        public void TestLogLargeSales()
+        {
+            Auction auction = CreateSuccessfulAuction(Auction.ItemCategory.Misc, 20000M);
+            string expectedLog = CreateAuctionLog(auction);
+            Assert.IsFalse(NotificationFactory.CarSaleLogger.FindMessage(expectedLog), "No log should be returned");
+            Assert.IsTrue(NotificationFactory.LargeSaleLogger.FindMessage(expectedLog), "Expected auction log: " + expectedLog);
+        }
+
+        [TestMethod]
+        public void TestLogOtherSales()
+        {
+            Auction auction = CreateSuccessfulAuction(Auction.ItemCategory.Misc, 1000M);
+            string expectedLog = CreateAuctionLog(auction);
+            Assert.IsFalse(NotificationFactory.LargeSaleLogger.FindMessage(expectedLog), "No log should be returned");
+
+
+        }
+
+        [TestMethod]
+        public void TestOffHoursMock()
+        {
+            var offHours = HoursFactory.GetHours(true);
+            Auction auction = CreateDefaultAuction();
+            auction.OffHours = offHours;
+            auction.OnStart();
+            auction.Bid(CreateDefaultBidder(), 10000M, out Auction.BidStatus bidStatus);
+            auction.OnClose();
+
+            string expectedLog = CreateAuctionLog(auction);
+            Assert.IsTrue(NotificationFactory.OffHoursLogger.FindMessage(expectedLog), "Expected auction log: " + expectedLog);
+
+        }
+
+        private class OffHoursShunt : Hours
+        {
+            public bool IsOffHours()
+            {
+                return true;
+            }
+        }
+
+        [TestMethod]
+        public void TestOffHoursShunt()
+        {
+            var offHours = HoursFactory.GetHours(true);
+            Auction auction = CreateDefaultAuction();
+            auction.OffHours = new OffHoursShunt();
+            auction.OnStart();
+            auction.Bid(CreateDefaultBidder(), 10000M, out Auction.BidStatus bidStatus);
+            auction.OnClose();
+
+            string expectedLog = CreateAuctionLog(auction);
+            Assert.IsTrue(NotificationFactory.OffHoursLogger.FindMessage(expectedLog), "Expected auction log: " + expectedLog);
+
+        }
     }
 }

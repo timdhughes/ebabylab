@@ -1,26 +1,26 @@
 using System;
-
-public sealed class OffHours : Hours
+namespace eBabyServices
 {
-    private readonly Random m_Random = new Random();
-
-    private OffHours()
+    public class OffHours : Hours
     {
-    }
+        private readonly Random m_Random = new Random();
 
-    #region Hours Members
+        private OffHours()
+        {
+        }
 
-    public bool IsOffHours()
-    {
-        bool ret = true;
-        ret = m_Random.Next()*10.0 >= 5.0 ? true : false;
-        return ret;
-    }
+        #region Hours Members
 
-    #endregion
+        public bool IsOffHours()
+        {
+            return (m_Random.Next() * 10.0 >= 5.0) ? true : false;
+        }
 
-    public static OffHours GetInstance()
-    {
-        return new OffHours();
+        #endregion
+
+        public static OffHours GetInstance()
+        {
+            return new OffHours();
+        }
     }
 }

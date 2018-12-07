@@ -6,16 +6,19 @@ using eBabyServices;
 
 namespace eBabyLab
 {
-    class SuccessfulSale : Sale
+    class SuccessfulSale : Notification
     {
-        public override bool SendNotifications(Auction auction, PostOffice postOffice)
+        public PostOffice PostOffice { get; set; }
+        public SuccessfulSale(PostOffice postOffice) { PostOffice = postOffice; }
+
+        public override bool SendNotifications(Auction auction)
         {
-            postOffice.SendEMail(auction.HighestBidder.UserEmail, "Congratulations! You won an auction for a " + auction.ItemDesc + " from " + auction.Seller.UserName + " for " + auction.CurrentPrice.ToString("C2") + ".");
-            postOffice.SendEMail(auction.Seller.UserEmail, "Your " + auction.ItemDesc + " auction sold to bidder " + auction.HighestBidder.UserEmail + " for " + auction.CurrentPrice.ToString("C2") + ".");
+            PostOffice.SendEMail(auction.HighestBidder.UserEmail, "Congratulations! You won an auction for a " + auction.ItemDesc + " from " + auction.Seller.UserName + " for " + auction.CurrentPrice.ToString("C2") + ".");
+            PostOffice.SendEMail(auction.Seller.UserEmail, "Your " + auction.ItemDesc + " auction sold to bidder " + auction.HighestBidder.UserEmail + " for " + auction.CurrentPrice.ToString("C2") + ".");
             return true;
         }
 
-        public override bool UpdatePrice(Auction auction)
+     /*   public override bool UpdatePrice(Auction auction)
         {
             auction.SellerAmount = .98M * auction.CurrentPrice;
 
@@ -40,6 +43,6 @@ namespace eBabyLab
             }
 
             return true;
-        }
+        }*/
     }
 }

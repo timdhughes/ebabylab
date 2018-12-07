@@ -28,6 +28,8 @@ namespace eBabyLab
         public User HighestBidder { get; set; }
         public decimal BuyerAmount { get; set; }
 
+        public Hours OffHours { get; set; }
+
         public static Auction Create(User seller, string itemdesc, decimal startingprice, DateTime starttime, DateTime endtime)
         {
 
@@ -93,15 +95,15 @@ namespace eBabyLab
 
         public void OnClose()
         {
-            Sale sale = SaleFactory.GetInstance(HighestBidder);
-            sale.SendNotifications(this, PostOffice);
-
             var fees = FeeFactory.GetFees(this);
-
             foreach (var fee in fees)
-            {
                 fee.Update(this);
-            }
+
+            List<Notification> notifications = NotificationFactory.GetInstance(this);
+            foreach (Notification notification in notifications)            
+                notification.SendNotifications(this);
+
+                        
         }
     }
 }

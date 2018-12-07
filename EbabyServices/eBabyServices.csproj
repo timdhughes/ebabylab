@@ -53,7 +53,9 @@
     <Compile Include="AuctionLogger.cs" />
     <Compile Include="AuctionTimer.cs" />
     <Compile Include="Hours.cs" />
+    <Compile Include="HoursFactory.cs" />
     <Compile Include="OffHours.cs" />
+    <Compile Include="OffHoursMock.cs" />
     <Compile Include="PostOffice.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
